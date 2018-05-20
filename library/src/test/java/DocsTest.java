@@ -36,13 +36,19 @@ public class DocsTest {
         Docs.buildHtmlDocs(getDocsConfig(Projects.JFinalProject));
     }
 
+    @Test
+    public void test_generateMultiModuleDocs(){
+        Resources.setDebug();
+        Docs.buildHtmlDocs(getDocsConfig("/Users/yeguozhong/Desktop/svnLibrary/jap"));
+    }
+
     private Docs.DocsConfig getDocsConfig(String projectPath){
         Docs.DocsConfig config = new Docs.DocsConfig();
         config.setProjectPath(projectPath);
-        config.setRapProjectId("1");
-        config.setRapHost("http://rap.yedaxia.me");
-        config.setRapAccount("***");
-        config.setRapPassword("123456");
+        //config.setRapProjectId("1");
+        //config.setRapHost("http://rap.yedaxia.me");
+        //config.setRapAccount("***");
+        //config.setRapPassword("123456");
         return config;
     }
 }

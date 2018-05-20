@@ -5,6 +5,7 @@ import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.type.Type;
 import io.github.yedaxia.apidocs.ParseUtils;
 import io.github.yedaxia.apidocs.Utils;
 
@@ -102,13 +103,12 @@ public class SpringControllerParser extends AbsControllerParser {
 
                 p.getAnnotations().forEach(an -> {
                     String name = an.getNameAsString();
-                    if (!"RequestParam".equals(name) && !"RequestBody".equals(name)) {
+                    if (!"RequestParam".equals(name) && !"RequestBody".equals(name) && !"PathVariable".equals(name)) {
                         return;
                     }
 
                     if ("RequestBody".equals(name)) {
-                        String type = p.getType().asString();
-                        setRequestBody(paramNode, type);
+                        setRequestBody(paramNode, p.getType());
                     }
 
                     if (an instanceof MarkerAnnotationExpr) {
@@ -116,13 +116,22 @@ public class SpringControllerParser extends AbsControllerParser {
                         return;
                     }
 
+                    if(an instanceof SingleMemberAnnotationExpr){
+                        paramNode.setName(((StringLiteralExpr) ((SingleMemberAnnotationExpr) an).getMemberValue()).getValue());
+                        return;
+                    }
+
                     if (an instanceof NormalAnnotationExpr) {
-                        ((NormalAnnotationExpr) an).getPairs().stream()
-                                .filter(n -> n.getNameAsString().equals("required"))
-                                .findFirst()
-                                .ifPresent(v -> {
-                                    paramNode.setRequired(Boolean.valueOf(v.getValue().toString()));
-                                });
+                        ((NormalAnnotationExpr) an).getPairs().forEach(pair -> {
+                            String exprName = pair.getNameAsString();
+                            if("required".equals(exprName)){
+                                Boolean exprValue = ((BooleanLiteralExpr) pair.getValue()).getValue();
+                                paramNode.setRequired(Boolean.valueOf(exprValue));
+                            }else if("value".equals(exprName)){
+                                String exprValue = ((StringLiteralExpr) pair.getValue()).getValue();
+                                paramNode.setName(exprValue);
+                            }
+                        });
                     }
 
                 });
@@ -130,25 +139,10 @@ public class SpringControllerParser extends AbsControllerParser {
         });
     }
 
-    private void setRequestBody(ParamNode paramNode, String rawType) {
-        String modelType;
-        boolean isList;
-        if (rawType.endsWith("[]")) {
-            isList = true;
-            modelType = rawType.replace("[]", "");
-        } else if (ParseUtils.isCollectionType(rawType)) {
-            isList = true;
-            modelType = rawType.substring(rawType.indexOf("<") + 1, rawType.length() - 1);
-        } else {
-            isList = false;
-            modelType = rawType;
-        }
-
-        if (ParseUtils.isModelType(modelType)) {
+    private void setRequestBody(ParamNode paramNode, Type paramType) {
+        if (ParseUtils.isModelType(paramType.asString())) {
             ClassNode classNode = new ClassNode();
-            classNode.setClassName(modelType);
-            classNode.setList(isList);
-            ParseUtils.parseResponseNode(ParseUtils.searchJavaFile(getControllerFile(), modelType), classNode);
+            ParseUtils.parseClassNodeByType(getControllerFile(), classNode, paramType);
             paramNode.setJsonBody(true);
             paramNode.setDescription(classNode.toJsonApi());
         }
